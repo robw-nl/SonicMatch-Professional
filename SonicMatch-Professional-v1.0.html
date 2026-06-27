@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SonicMatch Professional</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #121212; color: #e0e0e0; margin: 2rem; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header-group { margin-bottom: 2.5rem; border-bottom: 1px solid #222; padding-bottom: 1.5rem; }
+        .header-group h1 { margin: 0 0 0.5rem 0; font-size: 2.25rem; letter-spacing: -0.5px; }
+        .info-callout { background: #1a1a1a; border-left: 3px solid #00ff66; padding: 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; font-size: 0.9rem; line-height: 1.5; }
+        .format-badge-list { margin-bottom: 0.75rem; color: #fff; font-weight: 500; font-family: monospace; }
+        .production-warning { color: #aaa; font-size: 0.85rem; }
+        .license-notice { font-size: 0.8rem; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.5rem; }
+        .drop-zone { border: 2px dashed #444; padding: 2rem; text-align: center; margin-bottom: 1rem; cursor: pointer; background: #1e1e1e; border-radius: 6px; transition: all 0.2s ease; }
+        .drop-zone.hover { border-color: #00ff66; background: #252525; }
+        .panel { background: #1a1a1a; padding: 1.5rem; border-radius: 6px; margin-top: 1rem; border: 1px solid #333; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .card { background: #222; padding: 1rem; border-radius: 4px; border: 1px solid #444; text-align: center; }
+        .card h3 { margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-val { font-size: 1.75rem; font-weight: bold; color: #00ff66; font-family: monospace; }
+        .sub-val { font-size: 0.8rem; color: #888; margin-top: 0.25rem; }
+        .spinner { display: none; width: 32px; height: 32px; border: 4px solid #333; border-top: 4px solid #00ff66; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 1.5rem auto; }
+
+        .eq-controls { margin: 1rem 0; display: flex; align-items: center; gap: 1rem; }
+        .eq-select { background: #222; color: #fff; border: 1px solid #444; padding: 0.5rem 1rem; border-radius: 4px; font-size: 0.9rem; cursor: pointer; }
+
+        .eq-visualizer { margin: 1.5rem 0; background: #111; padding: 1rem; border-radius: 4px; border: 1px solid #333; }
+        .eq-bars { display: flex; height: 120px; align-items: flex-end; justify-content: space-between; padding-top: 20px; }
+        .eq-column { flex: 1; display: flex; flex-direction: column; align-items: center; margin: 0 4px; height: 100%; justify-content: flex-end; }
+        .bar-container { position: relative; width: 100%; height: 80px; background: #222; border-radius: 2px; overflow: hidden; }
+        .bar { position: absolute; bottom: 50%; width: 100%; height: 0; background: #ffaa00; transition: all 0.3s ease; }
+        .bar.positive { bottom: 50%; background: #00ff66; transform-origin: bottom; }
+        .bar.negative { top: 50%; background: #ff3333; transform-origin: top; }
+        .bar-label { font-size: 0.75rem; color: #888; margin-top: 0.5rem; text-align: center; line-height: 1.2; }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-group">
+            <h1>SonicMatch Professional</h1>
+            <div class="license-notice">This program is completely free to use, modify and distribute; but NOT if you intend to use my code for commercial gain.</div>
+
+            <div class="info-callout">
+                <div class="format-badge-list">⚡ Supports: WAV, FLAC, MP3, M4A/AAC, OGG/VORBIS</div>
+                <div class="production-warning">
+                    <strong>Engineering Rule:</strong> Cross-format mixing is fine for quick validation. For precise 1:1 hardware preset calibration or active mix tracking, prioritize uncompressed <strong>WAV</strong> or <strong>FLAC</strong> exports at matching sample rates to prevent compression artifacts or timing padding shifts.
+                </div>
+            </div>
+        </div>
+        <div id="drop-ref" class="drop-zone">Drop Reference Preset WAV Here</div>
+        <div id="drop-tgt" class="drop-zone">Drop Target Preset WAV Here</div>
+        <div id="spinner" class="spinner"></div>
+        <button id="btn-analyze" style="width:100%; padding:1rem; background:#00ff66; color:#000; border:none; font-weight:bold; font-size:1rem; border-radius:4px; cursor:pointer;">ANALYZE PRESET RELATION</button>
+
+        <div class="panel" id="results-panel" style="display:none;">
+            <div class="grid-3">
+                <div class="card">
+                    <h3>Volume Correction</h3>
+                    <div id="out-correction" class="metric-val">0.00 dB</div>
+                    <div class="sub-val">Match output block 1:1</div>
+                </div>
+                <div class="card">
+                    <h3>Character Match</h3>
+                    <div id="out-character" class="metric-val">0.0%</div>
+                    <div id="out-char-sub" class="sub-val">Timbre profile delta</div>
+                </div>
+                <div class="card">
+                    <h3>Cut-Through Power</h3>
+                    <div id="out-cutthrough" class="metric-val">0.0%</div>
+                    <div class="sub-val">Mid-presence placement</div>
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <h3>Stereo Width Delta</h3>
+                    <div id="out-stereo" class="metric-val">0.0%</div>
+                    <div class="sub-val">Target vs Ref spacing</div>
+                </div>
+                <div class="card">
+                    <h3>Sustain Level (N50)</h3>
+                    <div id="out-n50" class="metric-val">0.00</div>
+                    <div class="sub-val">Median perceived floor</div>
+                </div>
+                <div class="card">
+                    <h3>Transient Peaks (N5)</h3>
+                    <div id="out-n5" class="metric-val">0.00</div>
+                    <div class="sub-val">Top 5% loudness burst</div>
+                </div>
+            </div>
+
+            <div class="eq-controls">
+                <label for="eq-mode" style="font-size: 0.9rem; color: #aaa;">Target EQ Block Layout:</label>
+                <select id="eq-mode" class="eq-select">
+                    <option value="8band">8-Band Psychoacoustic (Default)</option>
+                    <option value="4band">4-Band Amp/Parametric (Bass/Mid/Treb/Pres)</option>
+                    <option value="10band">10-Band Graphic (Classic Stompbox)</option>
+                    <option value="parametric">Pure Parametric (Geometric Optimization)</option>
+                </select>
+            </div>
+
+            <div class="eq-visualizer">
+                <strong id="eq-visualizer-title" style="font-size:0.9rem; color:#aaa; text-transform:uppercase;">8-Band Spectral Balance Dev</strong>
+                <div class="eq-bars" id="eq-bars-container"></div>
+            </div>
+
+            <div id="out-eq-list" style="margin-top:1rem; border-top:1px solid #444; padding-top:1rem;"></div>
+        </div>
+    </div>
+
+    <script>
+        let audioBuffers = { ref: null, tgt: null };
+        let activeAnalysisCache = null;
+
+        ['ref', 'tgt'].forEach(type => {
+            const el = document.getElementById(`drop-${type}`);
+            el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('hover'); });
+            el.addEventListener('dragleave', () => el.classList.remove('hover'));
+            el.addEventListener('drop', async e => {
+                e.preventDefault();
+                el.classList.remove('hover');
+                const file = e.dataTransfer.files[0];
+
+                if (file) {
+                    // 1. Strict File Type Validation
+                    const validExtensions = ['.wav', '.flac', '.mp3', '.m4a', '.ogg'];
+                    const fileName = file.name.toLowerCase();
+                    const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+                    const isAudioMime = file.type.startsWith('audio/');
+
+                    if (!isAudioMime && !isValidExtension) {
+                        alert(`Format Rejected: ${file.name}\n\nSonicMatch only accepts supported audio files (WAV, FLAC, MP3, M4A, OGG).`);
+                        return; // Halt execution immediately
+                    }
+
+                    // 2. Safe Decoding Pipeline
+                    try {
+                        el.innerText = `Decoding ${file.name}...`;
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const arrayBuffer = await file.arrayBuffer();
+                        audioBuffers[type] = await ctx.decodeAudioData(arrayBuffer);
+                        ctx.close();
+
+                        el.innerText = `${file.name} Loaded`;
+                        el.style.borderColor = '#00ff66'; // Visual lock-in
+                        el.style.color = '#00ff66';
+                    } catch (error) {
+                        alert(`Decoding Error: ${file.name}\n\nThe file is either corrupted, encrypted, or uses an unsupported proprietary codec.`);
+                        el.innerText = `Drop ${type === 'ref' ? 'Reference' : 'Target'} Preset WAV Here`;
+                        el.style.borderColor = '#ff3333'; // Visual error state
+                        el.style.color = '#e0e0e0';
+                        audioBuffers[type] = null; // Clear bad data
+                    }
+                }
+            });
+        });
+
+        class SMEngine {
+            constructor(sampleRate = 44100, fftSize = 4096) {
+                this.sampleRate = sampleRate;
+                this.fftSize = fftSize;
+                this.barkLimits = [20, 100, 200, 300, 400, 510, 630, 770, 920, 1080, 1270, 1480, 1720, 2000, 2320, 2700, 3150, 3700, 4400, 5300, 6400, 7700, 9500, 12000, 15500];
+
+                this.profiles = {
+                    "8band": [
+                        { name: "Sub Bass", low: 0, high: 2, center: 60 },
+                        { name: "Low End", low: 2, high: 5, center: 150 },
+                        { name: "Low Mids", low: 5, high: 8, center: 450 },
+                        { name: "Mids", low: 8, high: 11, center: 850 },
+                        { name: "High Mids", low: 11, high: 14, center: 1600 },
+                        { name: "Presence", low: 14, high: 17, center: 2400 },
+                        { name: "Brilliance", low: 17, high: 20, center: 5000 },
+                        { name: "Air", low: 20, high: 23, center: 10000 }
+                    ],
+                    "4band": [
+                        { name: "Bass", low: 0, high: 5, center: 100 },
+                        { name: "Mids", low: 5, high: 11, center: 650 },
+                        { name: "Treble", low: 11, high: 16, center: 2000 },
+                        { name: "Presence", low: 16, high: 23, center: 4500 }
+                    ],
+                    "10band": [
+                        { name: "31Hz", low: 0, high: 1, center: 31 },
+                        { name: "62Hz", low: 1, high: 3, center: 62 },
+                        { name: "125Hz", low: 3, high: 5, center: 125 },
+                        { name: "250Hz", low: 5, high: 7, center: 250 },
+                        { name: "500Hz", low: 7, high: 9, center: 500 },
+                        { name: "1kHz", low: 9, high: 12, center: 1000 },
+                        { name: "2kHz", low: 12, high: 15, center: 2000 },
+                        { name: "4kHz", low: 15, high: 18, center: 4000 },
+                        { name: "8kHz", low: 18, high: 21, center: 8000 },
+                        { name: "16kHz", low: 21, high: 23, center: 16000 }
+                    ],
+                    "parametric": [
+                        { name: "P1 Low-Shelf", low: 0, high: 4, center: 80 },
+                        { name: "P2 Low Peaking", low: 4, high: 8, center: 320 },
+                        { name: "P3 Mid Peaking", low: 8, high: 13, center: 900 },
+                        { name: "P4 High Peaking", low: 13, high: 18, center: 2500 },
+                        { name: "P5 High-Shelf", low: 18, high: 23, center: 6800 }
+                    ]
+                };
+            }
+
+            fft(real, imag) {
+                const n = real.length;
+                if (n <= 1) return;
+                for (let i = 1, j = 0; i < n; i++) {
+                    let bit = n >> 1;
+                    for (; j & bit; bit >>= 1) j ^= bit;
+                    j ^= bit;
+                    if (i < j) {
+                        let temp = real[i]; real[i] = real[j]; real[j] = temp;
+                        temp = imag[i]; imag[i] = imag[j]; imag[j] = temp;
+                    }
+                }
+                for (let len = 2; len <= n; len <<= 1) {
+                    let ang = (2 * Math.PI / len) * -1;
+                    let wreal = Math.cos(ang);
+                    let wimag = Math.sin(ang);
+                    for (let i = 0; i < n; i += len) {
+                        let ureal = 1, uimag = 0;
+                        for (let j = 0; j < len / 2; j++) {
+                            let idx1 = i + j;
+                            let idx2 = i + j + len / 2;
+                            let vreal = real[idx2] * ureal - imag[idx2] * uimag;
+                            let vimag = real[idx2] * uimag + imag[idx2] * ureal;
+                            real[idx2] = real[idx1] - vreal;
+                            imag[idx2] = imag[idx1] - vimag;
+                            real[idx1] += vreal;
+                            imag[idx1] += vimag;
+                            let next_ureal = ureal * wreal - uimag * wimag;
+                            uimag = ureal * wimag + uimag * wreal;
+                            ureal = next_ureal;
+                        }
+                    }
+                }
+            }
+
+            getBarkBands(magnitude) {
+                const bands = new Float32Array(24);
+                const binResolution = this.sampleRate / this.fftSize;
+                for (let i = 0; i < magnitude.length; i++) {
+                    const freq = i * binResolution;
+                    let barkIdx = 0;
+                    while (barkIdx < 24 && freq > this.barkLimits[barkIdx + 1]) {
+                        barkIdx++;
+                    }
+                    if (barkIdx < 24) {
+                        bands[barkIdx] += magnitude[i];
+                    }
+                }
+                return bands;
+            }
+
+            applyPsychoacousticWeighting(barkBands) {
+                const sones = new Float32Array(24);
+                for (let i = 0; i < 24; i++) {
+                    sones[i] = Math.pow(barkBands[i] + 1e-6, 0.23);
+                }
+                return sones;
+            }
+
+            calculateTotalLoudness(sones) {
+                return sones.reduce((sum, val) => sum + val, 0);
+            }
+
+            analyzeTimeStructures(buffer) {
+                const chL = buffer.getChannelData(0);
+                const chR = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : chL;
+                const step = this.fftSize / 2;
+
+                const timeSeriesN = [];
+                const accumulatedBarks = new Float32Array(24);
+                let stereoWidthSum = 0;
+                let frames = 0;
+
+                for (let offset = 0; offset + this.fftSize <= chL.length; offset += step) {
+                    const realL = new Float32Array(this.fftSize);
+                    const imagL = new Float32Array(this.fftSize);
+                    let midPower = 0, sidePower = 0;
+
+                    for (let i = 0; i < this.fftSize; i++) {
+                        const lSample = chL[offset + i];
+                        const rSample = chR[offset + i];
+
+                        const mid = (lSample + rSample) * 0.5;
+                        const side = (lSample - rSample) * 0.5;
+                        midPower += mid * mid;
+                        sidePower += side * side;
+
+                        let windowValue = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (this.fftSize - 1)));
+                        realL[i] = lSample * windowValue;
+                    }
+
+                    stereoWidthSum += (sidePower / (midPower + sidePower + 1e-6));
+
+                    this.fft(realL, imagL);
+                    const magnitude = new Float32Array(this.fftSize / 2);
+                    for (let i = 0; i < this.fftSize / 2; i++) {
+                        magnitude[i] = Math.sqrt(realL[i] * realL[i] + imagL[i] * imagL[i]);
+                    }
+
+                    const barks = this.getBarkBands(magnitude);
+                    const sonesFrame = this.applyPsychoacousticWeighting(barks);
+                    const frameTotalN = this.calculateTotalLoudness(sonesFrame);
+
+                    timeSeriesN.push(frameTotalN);
+
+                    for (let j = 0; j < 24; j++) {
+                        accumulatedBarks[j] += barks[j];
+                    }
+                    frames++;
+                }
+
+                if (frames > 0) {
+                    for (let j = 0; j < 24; j++) accumulatedBarks[j] /= frames;
+                }
+
+                timeSeriesN.sort((a, b) => a - b);
+                const n50 = timeSeriesN[Math.floor(timeSeriesN.length * 0.5)] || 0;
+                const n5Index = Math.floor(timeSeriesN.length * 0.95);
+                const n5 = timeSeriesN[n5Index] || 0;
+
+                let meanN = timeSeriesN.reduce((s, v) => s + v, 0) / (timeSeriesN.length || 1);
+                let varianceSum = timeSeriesN.reduce((s, v) => s + Math.pow(v - meanN, 2), 0);
+                const dynamicVariance = Math.sqrt(varianceSum / (timeSeriesN.length || 1));
+
+                return {
+                    averagedSones: this.applyPsychoacousticWeighting(accumulatedBarks),
+                    n50,
+                    n5,
+                    dynamicVariance,
+                    stereoWidth: (stereoWidthSum / (frames || 1)) * 100
+                };
+            }
+        }
+
+        function renderEQReport(mode) {
+            if (!activeAnalysisCache) return;
+
+            const { refAnalysis, tgtAnalysis, correction } = activeAnalysisCache;
+            const engine = new SMEngine();
+            const bands = engine.profiles[mode];
+
+            document.getElementById('eq-visualizer-title').innerText = `${mode.toUpperCase()} Spectral Balance Dev`;
+
+            const barsContainer = document.getElementById('eq-bars-container');
+            const eqListContainer = document.getElementById('out-eq-list');
+            barsContainer.innerHTML = '';
+            eqListContainer.innerHTML = `<strong>${mode.toUpperCase()} Target Equalization Match Actions:</strong><br>`;
+
+            let suggestionsCount = 0;
+
+            bands.forEach(band => {
+                let refSum = 0, tgtSum = 0;
+                for (let i = band.low; i <= band.high; i++) {
+                    refSum += refAnalysis.averagedSones[i];
+                    tgtSum += tgtAnalysis.averagedSones[i];
+                }
+                const ratio = (refSum + 1e-5) / (tgtSum + 1e-5);
+                const gainDev = ((20 / 0.23) * Math.log10(ratio)) - correction;
+
+                const col = document.createElement('div');
+                col.className = 'eq-column';
+
+                const heightPercent = Math.min(50, Math.abs(gainDev) * 5);
+                const dynamicClass = gainDev >= 0 ? 'positive' : 'negative';
+
+                col.innerHTML = `
+                    <div class="bar-container">
+                        <div class="bar ${dynamicClass}" style="height: ${heightPercent}%;"></div>
+                    </div>
+                    <div class="bar-label" style="font-size:10px;">${band.name}<br><span style="color:#aaa;">${gainDev.toFixed(1)}dB</span></div>
+                `;
+                barsContainer.appendChild(col);
+
+                if (Math.abs(gainDev) > 0.5) {
+                    suggestionsCount++;
+                    const freqStr = band.center >= 1000 ? `${(band.center / 1000).toFixed(1)}kHz` : `${band.center}Hz`;
+                    let qVal = mode === '10band' ? 'Graphic Slider' : mode === '4band' ? '0.7 (Wide Pass)' : '1.4';
+                    eqListContainer.innerHTML += `<div style="margin-top:0.25rem; font-family:monospace; color:#ffaa00;">${band.name} -> Freq: ${freqStr}, Gain: ${gainDev.toFixed(1)}dB, Q: ${qVal}</div>`;
+                }
+            });
+
+            if (suggestionsCount === 0) {
+                eqListContainer.innerHTML += `<div style="margin-top:0.25rem; font-family:monospace; color:#00ff66;">Spectral balance target reached! No EQ tweaks required.</div>`;
+            }
+        }
+
+        document.getElementById('eq-mode').addEventListener('change', (e) => {
+            renderEQReport(e.target.value);
+        });
+
+        document.getElementById('btn-analyze').addEventListener('click', () => {
+            if (!audioBuffers.ref || !audioBuffers.tgt) {
+                alert('Drop both reference and target WAV files first.');
+                return;
+            }
+
+            const durationDelta = Math.abs(audioBuffers.ref.duration - audioBuffers.tgt.duration);
+            if (durationDelta > 0.5) {
+                alert(`File Length Mismatch!\n\nReference: ${audioBuffers.ref.duration.toFixed(2)}s\nTarget: ${audioBuffers.tgt.duration.toFixed(2)}s\n\nTo match patches accurately, your takes must be identical performances of the same length.`);
+                return;
+            }
+
+            const spinner = document.getElementById('spinner');
+            const resultsPanel = document.getElementById('results-panel');
+
+            spinner.style.display = 'block';
+            resultsPanel.style.display = 'none';
+
+            setTimeout(() => {
+                const engine = new SMEngine(audioBuffers.ref.sampleRate);
+
+                const chLRef = audioBuffers.ref.getChannelData(0);
+                const chLTgt = audioBuffers.tgt.getChannelData(0);
+                const step = engine.fftSize / 2;
+
+                const refTimelineLoudness = [];
+                const tgtTimelineLoudness = [];
+
+                for (let offset = 0; offset + engine.fftSize <= chLRef.length; offset += step) {
+                    let refPwr = 0, tgtPwr = 0;
+                    for (let i = 0; i < engine.fftSize; i++) {
+                        refPwr += chLRef[offset + i] * chLRef[offset + i];
+                        tgtPwr += chLTgt[offset + i] * chLTgt[offset + i];
+                    }
+                    refTimelineLoudness.push(Math.pow(refPwr + 1e-6, 0.23));
+                    tgtTimelineLoudness.push(Math.pow(tgtPwr + 1e-6, 0.23));
+                }
+
+                const totalFrames = Math.min(refTimelineLoudness.length, tgtTimelineLoudness.length);
+                let meanRef = 0, meanTgt = 0;
+                for (let i = 0; i < totalFrames; i++) {
+                    meanRef += refTimelineLoudness[i];
+                    meanTgt += tgtTimelineLoudness[i];
+                }
+                meanRef /= totalFrames;
+                meanTgt /= totalFrames;
+                let rDot = 0, rSqRef = 0, rSqTgt = 0;
+                for (let i = 0; i < totalFrames; i++) {
+                    const devRef = refTimelineLoudness[i] - meanRef;
+                    const devTgt = tgtTimelineLoudness[i] - meanTgt;
+                    rDot += devRef * devTgt;
+                    rSqRef += devRef * devRef;
+                    rSqTgt += devTgt * devTgt;
+                }
+                const timelineCorrelation = rDot / (Math.sqrt(rSqRef * rSqTgt) + 1e-6);
+
+                if (timelineCorrelation < 0.92) {
+                    spinner.style.display = 'none';
+                    alert(`Sonic Profile Mismatch! (Timeline Sync: ${(timelineCorrelation * 100).toFixed(1)}%)\n\nRejected: The performance content varies structurally over time. Ensure you are analyzing identical performances of the same take.`);
+                    return;
+                }
+
+                const refAnalysis = engine.analyzeTimeStructures(audioBuffers.ref);
+                const tgtAnalysis = engine.analyzeTimeStructures(audioBuffers.tgt);
+
+                let refSumEnergy = 0, tgtSumEnergy = 0;
+                for (let i = 0; i < 24; i++) {
+                    refSumEnergy += refAnalysis.averagedSones[i];
+                    tgtSumEnergy += tgtAnalysis.averagedSones[i];
+                }
+
+                let dotProduct = 0, normRef = 0, normTgt = 0;
+                for (let i = 0; i < 24; i++) {
+                    const refNormToken = refAnalysis.averagedSones[i] / (refSumEnergy + 1e-6);
+                    const tgtNormToken = tgtAnalysis.averagedSones[i] / (tgtSumEnergy + 1e-6);
+                    dotProduct += refNormToken * tgtNormToken;
+                    normRef += refNormToken * refNormToken;
+                    normTgt += tgtNormToken * tgtNormToken;
+                }
+                const timbreSimilarity = normRef === 0 || normTgt === 0 ? 0 : dotProduct / (Math.sqrt(normRef) * Math.sqrt(normTgt));
+
+                const refN = engine.calculateTotalLoudness(refAnalysis.averagedSones);
+                const tgtN = engine.calculateTotalLoudness(tgtAnalysis.averagedSones);
+                const correction = tgtN === 0 ? 0 : (20 / 0.23) * Math.log10(refN / tgtN);
+
+                const dynamicsDelta = Math.abs(refAnalysis.dynamicVariance - tgtAnalysis.dynamicVariance) / (refAnalysis.dynamicVariance + 1e-6);
+                const combinedCharacterScore = Math.max(0, (timbreSimilarity * 100) - (dynamicsDelta * 15));
+
+                let midEnergy = 0, totalEnergy = 0;
+                for (let i = 0; i < 24; i++) {
+                    if (i >= 8 && i <= 16) midEnergy += tgtAnalysis.averagedSones[i];
+                    totalEnergy += tgtAnalysis.averagedSones[i];
+                }
+                const cutThrough = totalEnergy === 0 ? 0 : midEnergy / totalEnergy;
+
+                document.getElementById('out-correction').innerText = `${correction.toFixed(2)} dB`;
+                document.getElementById('out-character').innerText = `${combinedCharacterScore.toFixed(1)}%`;
+                document.getElementById('out-cutthrough').innerText = `${(cutThrough * 100).toFixed(1)}%`;
+                document.getElementById('out-stereo').innerText = `${tgtAnalysis.stereoWidth.toFixed(1)}%`;
+                document.getElementById('out-n50').innerText = tgtAnalysis.n50.toFixed(2);
+                document.getElementById('out-n5').innerText = tgtAnalysis.n5.toFixed(2);
+
+                document.getElementById('out-char-sub').innerText = combinedCharacterScore < 85 ? "EQ or compression issue found" : "Timbre matches reference closely";
+
+                activeAnalysisCache = { refAnalysis, tgtAnalysis, correction };
+                renderEQReport(document.getElementById('eq-mode').value);
+
+                spinner.style.display = 'none';
+                resultsPanel.style.display = 'block';
+            }, 50);
+        });
+    </script>
+</body>
+</html>
